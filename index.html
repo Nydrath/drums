@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#120d0a">
+  <meta name="description" content="An endless Malinke-style drum ensemble for dancing">
+  <title>Drums</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div id="rhythm">Drums</div>
+    <div id="meta">&nbsp;</div>
+  </header>
+
+  <main>
+    <div id="sliders">
+      <div class="col">
+        <div class="cap">intensity</div>
+        <div id="slider" class="slider" role="slider" aria-label="Intensity" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+          <div id="energy" class="fill"></div>
+          <div id="center" class="center"></div>
+          <div id="target" class="knob"><span></span></div>
+          <div class="mark at92">frenzy</div>
+          <div class="mark at72">fire</div>
+          <div class="mark at50">dance</div>
+          <div class="mark at26">groove</div>
+          <div class="mark at4">warm up</div>
+        </div>
+      </div>
+      <div class="col narrow">
+        <div class="cap" id="tempoCap">tempo</div>
+        <div id="tempo" class="slider" role="slider" aria-label="Tempo" aria-valuemin="90" aria-valuemax="200" tabindex="0">
+          <div id="tempoNow" class="fill cool"></div>
+          <div id="tempoCenter" class="center"></div>
+          <div id="tempoKnob" class="knob"><span></span></div>
+          <div class="mark at81_8">180</div>
+          <div class="mark at63_6">160</div>
+          <div class="mark at45_5">140</div>
+          <div class="mark at27_3">120</div>
+          <div class="mark at9_1">100</div>
+        </div>
+      </div>
+    </div>
+    <div id="players">
+      <span data-p="LEAD">lead</span>
+      <span data-p="DJ1">djembe</span><span data-p="DJ2">djembe</span><span data-p="DJ3">djembe</span>
+      <span data-p="KK">kenkeni</span><span data-p="SB">sangban</span><span data-p="DB">dundunba</span>
+      <span data-p="SH">shekere</span>
+    </div>
+  </main>
+
+  <footer>
+    <div class="row">
+      <button id="play" class="big">Play</button>
+      <button id="break" class="big brk" disabled>Skip</button>
+      <button id="auto" class="toggle" aria-pressed="false">Drift</button>
+    </div>
+  </footer>
+  <div id="status"></div>
+  <div id="credits"></div>
+  <audio id="out" playsinline></audio>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
