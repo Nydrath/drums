@@ -1,4 +1,4 @@
-const APP_VERSION = "td-23";
+const APP_VERSION = "td-24";
 const $ = (id) => document.getElementById(id);
 const store = { get: (k, d) => {
   try {
@@ -95,7 +95,8 @@ async function resumeOutput(why) {
   if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
 }
 async function setup() {
-  status("loading the drums…");
+  S.started = true;
+  status("preparing the drums…");
   const ctx = new AudioContext({ latencyHint: "balanced" });
   await ctx.audioWorklet.addModule("worklet.js");
   const [buf, idx] = await Promise.all([fetch("kit/kit.ogg", { cache: "no-cache" }).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)), fetch("kit/kit.json", { cache: "no-cache" }).then((r) => r.json())]);
@@ -229,7 +230,18 @@ fetch("kit/kit.json", { cache: "no-cache" }).then((r) => r.json()).then((k) => {
   all.href = "credits.html";
   all.textContent = "all credits";
   el.append(" · ", all);
+  navigator.serviceWorker?.ready.then(() => el.append(" · works offline"));
 }).catch(() => {
 });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {
-});
+if ("serviceWorker" in navigator) {
+  const sw = navigator.serviceWorker;
+  let replacing = !!sw.controller;
+  sw.addEventListener("controllerchange", () => {
+    if (replacing && !S.started) location.reload();
+    replacing = true;
+  });
+  sw.register("sw.js").catch(() => {
+  });
+  navigator.storage?.persist?.().catch(() => {
+  });
+}
