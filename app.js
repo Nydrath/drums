@@ -1,4 +1,5 @@
-const APP_VERSION = "td-24";
+const APP_VERSION = "td-25";
+document.documentElement.dataset.version = APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const store = { get: (k, d) => {
   try {
@@ -218,7 +219,6 @@ function status(t) {
 }
 fetch("kit/kit.json", { cache: "no-cache" }).then((r) => r.json()).then((k) => {
   const el = $("credits");
-  el.append(`${APP_VERSION} · `);
   for (const [i, c] of (k.credits || []).entries()) {
     if (i) el.append(" · ");
     const a = document.createElement("a");
@@ -230,7 +230,6 @@ fetch("kit/kit.json", { cache: "no-cache" }).then((r) => r.json()).then((k) => {
   all.href = "credits.html";
   all.textContent = "all credits";
   el.append(" · ", all);
-  navigator.serviceWorker?.ready.then(() => el.append(" · works offline"));
 }).catch(() => {
 });
 if ("serviceWorker" in navigator) {
