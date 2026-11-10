@@ -1,4 +1,4 @@
-const APP_VERSION = "td-25";
+const APP_VERSION = "td-26";
 document.documentElement.dataset.version = APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const store = { get: (k, d) => {

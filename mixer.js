@@ -28,6 +28,7 @@ export class Mixer {
     this.att = 1 - Math.exp(-1 / (this.la / 3));
     this.rel = 1 - Math.exp(-1 / (0.12 * sr));
     this.thr = 0.95;
+    this.trim = 0.926;
     this.knee = 0.7;
     this.clipped = 0;
     this.ls = [0, 0];
@@ -181,8 +182,8 @@ export class Mixer {
       let yl = dl * g, yr = dr * g;
       yl = yl > 0.98 ? 0.98 + 0.02 * Math.tanh((yl - 0.98) / 0.02) : yl < -0.98 ? -0.98 + 0.02 * Math.tanh((yl + 0.98) / 0.02) : yl;
       yr = yr > 0.98 ? 0.98 + 0.02 * Math.tanh((yr - 0.98) / 0.02) : yr < -0.98 ? -0.98 + 0.02 * Math.tanh((yr + 0.98) / 0.02) : yr;
-      outL[i] = yl;
-      outR[i] = yr;
+      outL[i] = yl * this.trim;
+      outR[i] = yr * this.trim;
       if (1 - g > red) red = 1 - g;
     }
     this.reduction = red;
