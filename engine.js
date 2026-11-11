@@ -11,7 +11,6 @@ export function rng32(seed) {
 export const PLAYERS = { DB: { kit: "DB", type: "dunun", pan: -0.1, gain: 2.24, room: 0.14, role: "dun" }, DBB: { kit: "DBB", type: "bell", pan: -0.25, gain: 2.13, room: 0.08, role: "dun" }, SB: { kit: "SB", type: "dunun", pan: 0.35, gain: 1.03, room: 0.14, role: "dun" }, SBB: { kit: "SBB", type: "bell", pan: 0.45, gain: 1.33, room: 0.08, role: "dun" }, KK: { kit: "KK", type: "dunun", pan: -0.4, gain: 0.77, room: 0.14, role: "dun" }, KKB: { kit: "KKB", type: "bell", pan: -0.5, gain: 1.53, room: 0.08, role: "dun" }, DJ1: { kit: "DJ1", type: "djembe", pan: -0.45, gain: 0.95, room: 0.2, role: "acc" }, DJ2: { kit: "DJ2", type: "djembe", pan: 0.5, gain: 0.8, room: 0.2, role: "acc" }, DJ3: { kit: "DJ3", type: "djembe", pan: -0.7, gain: 0.7, room: 0.22, role: "acc" }, LEAD: { kit: "LEAD", type: "djembe", pan: 0.08, gain: 1.05, room: 0.2, role: "lead" }, SUB: { kit: "SUB", type: "sub", pan: 0, gain: 1.2, room: 0, role: "dun" }, SH: { kit: "SH", type: "shaker", pan: 0.25, gain: 5.2, room: 0.1, role: "acc" } };
 const ROLE = { dun: { bias: [3, 8], sd: 0.014 }, acc: { bias: [-2, 2], sd: 9e-3 }, lead: { bias: [-10, -5], sd: 0.019 } };
 export const ORDER = ["DB", "DBB", "SB", "SBB", "KK", "KKB", "DJ1", "DJ2", "DJ3", "SH"];
-const GROUPS = [["DB", "DBB"], ["SB", "SBB"], ["KK", "KKB"], ["DJ1"], ["DJ2"], ["DJ3"], ["SH"]];
 export const TEMPO = { min: 90, max: 200, start: 120 };
 const WARM = 45, WARM_DROP = 0.12;
 const SOFT = 0.5;
@@ -19,7 +18,7 @@ const LIMIT = { 4: 60 / (4 * 0.085), 3: 60 / (3 * 0.085) };
 const BASE_TH = { DB: 0, DBB: 0, DJ1: 0.04, SB: 0.09, SBB: 0.12, DJ2: 0.16, KK: 0.21, KKB: 0.24, SH: 0.32, DJ3: 0.38 };
 const VEL = { djembe: { B: 0.92, T: 0.78, S: 0.86, g: 0.3, s: 0.34, f: 0.95 }, dunun: { X: 1, O: 0.82, o: 0.5, c: 0.72, p: 0.55 }, bell: { X: 1, x: 0.8, o: 0.5 }, shaker: { X: 1, x: 0.8, o: 0.6 } };
 export const FEELS = { SML: [0, 0.25, 0.58], SOLI: [0, 0.22, 0.56], SLL: [0, 0.28, 0.64], LFF: [0, 0.4, 0.7], T3: [0, 1 / 3, 2 / 3], SFLF: [0, 0.18, 0.44, 0.76], T4: [0, 0.25, 0.5, 0.75] };
-function onsets(feel, ppb, bpm) {
+export function onsets(feel, ppb, bpm) {
   if (ppb === 3) {
     let f = FEELS[feel] || FEELS.SML;
     if (feel === "SML" || feel === "SOLI") {
@@ -112,6 +111,12 @@ class Lead {
       }
     }
     return out;
+  }
+  pivot(sub, E) {
+    const e = this.e, r = e.rng, d = clamp((E - 0.45) / 0.45, 0, 1);
+    const cell = r() < 0.5 ? e.pick(CELLS[sub]) : this.genCell(sub, d);
+    const gap = d > 0.75 ? 0 : e.pick([0, 1, sub]);
+    return tile(cell, sub, e.pick([0, 0, 1]), gap, 99);
   }
   newPhrase(ppb, E) {
     const e = this.e, r = e.rng, R = e.R, none = [];
@@ -234,7 +239,6 @@ export class Engine {
     this.recent = [];
     this.queue = [];
     this.after = null;
-    this.morph = null;
     this.bump = 0;
     this.tempo = tempo;
     this.tempoT = tempo;
@@ -247,6 +251,7 @@ export class Engine {
     this.center = target;
     this.j = null;
     this.crash = false;
+    this.feel = null;
     this.pulse = 0;
     this.sub = 1;
     this.soft0 = SOFT;
@@ -347,7 +352,7 @@ export class Engine {
     this.E += clamp(this.target - this.E, -0.025 * barSec, 0.032 * barSec);
   }
   updateTempo(barSec = 4 * 60 / this.bpm) {
-    const R = this.morph ? this.morph.to : this.R;
+    const R = this.hand && !this.hand.on ? this.hand.to : this.R;
     const lim = Math.min(LIMIT[this.R.ppb], LIMIT[R.ppb]);
     const drift = this.auto ? clamp(0.24 * (this.target - this.center), -0.05, 0.06) : 0;
     const warm = this.warm > 0 ? 1 - WARM_DROP * this.warm / WARM : 1;
@@ -366,8 +371,14 @@ export class Engine {
     this.tempo = bpm;
     this.brisk = true;
   }
+  feelNow(ppb) {
+    const H = this.hand, R = H && H.to.ppb === ppb && !(H.brk && this.E >= 0.45) ? H.to : this.R;
+    const want = onsets(R.feel, ppb, this.bpm);
+    if (!this.feel || this.feel.length !== want.length) this.feel = want;
+    else this.feel = this.feel.map((x, i) => x + clamp(want[i] - x, -0.025, 0.025));
+    return this.feel;
+  }
   decide(bip) {
-    const r = this.rng, E = this.E;
     if (this.stopping) {
       if (this.ending) return;
       this.ending = true;
@@ -379,68 +390,75 @@ export class Engine {
       this.breakReq = false;
       this.lead.focus = [];
       this.lead.rest = 0;
-      const target = this.hand && !this.hand.back ? this.hand.to : this.morph ? this.morph.to : null;
+      const target = this.hand && !this.hand.on ? this.hand.to : null;
       this.hand = null;
-      this.morph = null;
       this.muted.clear();
       this.queue = ["signal", "break"];
       this.after = target && target !== this.R ? target : this.pickRhythm();
       return;
     }
-    if (this.morph || this.hand || this.queue.length || this.lead.focus.length) return;
+    const H = this.hand;
+    if (H && !H.on && H.brk && this.E >= 0.45 && bip === 3 && H.k >= 1 && !this.queue.length) {
+      this.queue = ["break"];
+      this.after = H.to;
+      this.hand = null;
+      this.muted.clear();
+      return;
+    }
+    if (this.hand || this.queue.length || this.lead.focus.length) return;
     if (bip !== 0) return;
     const valley = this.auto && this.j && (this.j.phase === "release" || this.j.phase === "rest");
     const due = this.auto ? valley && this.elapsed >= 60 || this.elapsed >= this.rhythmLen * 1.5 : this.elapsed >= this.rhythmLen;
-    if (due || this.misfit > 20) {
-      const next = this.pickRhythm();
-      if (next.ppb === this.R.ppb && this.fit(next) > 0.5 && r() < 0.3) this.beginMorph(next);
-      else this.beginHandover(next);
-    }
-  }
-  beginMorph(to) {
-    const order = GROUPS.slice().sort(() => this.rng() - 0.5);
-    this.morph = { to, order };
-  }
-  stepMorph() {
-    const M = this.morph;
-    for (const n of M.order.shift()) this.useRhythm(n, M.to);
-    if (!M.order.length) {
-      const keep = { base: this.base, bpm: this.bpm, arc: this.arc, rbar: this.rbar % 4, src: this.src, ver: this.ver, prio: this.prio, on: this.on };
-      this.morph = null;
-      this.startRhythm(M.to);
-      Object.assign(this, keep);
-    }
+    if (due || this.misfit > 20) this.beginHandover(this.pickRhythm());
   }
   beginHandover(to) {
-    const out = ["LEAD", "SH", "DJ3", "KKB", "DJ2", "KK", "SBB", "DJ1", "SB"];
-    this.hand = { to, out, back: null };
+    const cross = to.ppb !== this.R.ppb, a = onsets(this.R.feel, this.R.ppb, this.bpm), b = onsets(to.feel, to.ppb, this.bpm);
+    const brk = !cross && Math.max(...a.map((x, i) => Math.abs(x - b[i]))) > 0.05;
+    this.hand = { to, cross, brk, k: 0, last: false, on: false, phrase: null, next: ["DJ1", "DJ2", "SH", "DJ3"] };
     this.lead.focus = [];
-    this.lead.rest = 99;
+    this.lead.rest = 0;
+    this.lead.sinceFocus = 0;
   }
   stepHandover() {
     const H = this.hand;
-    if (H.out.length) {
-      for (const n2 of H.out.splice(0, 2)) this.muted.add(n2);
-      return;
-    }
-    if (!H.back) {
-      const keepOn = { ...this.on }, base = this.base, bpm = this.bpm, arc = this.arc;
+    if (!H.on) {
+      H.k++;
+      if (H.k <= 2 || this.rbar % 4 !== 0) {
+        H.last = this.rbar % 4 === 3 && H.k >= 2;
+        return;
+      }
+      const keep = { on: { ...this.on }, base: this.base, bpm: this.bpm, arc: this.arc };
+      const old = Object.fromEntries(H.next.map((n2) => [n2, [this.src[n2], this.ver[n2], this.prio[n2], this.varUntil[n2]]]));
       this.startRhythm(H.to);
-      Object.assign(this, { on: keepOn, base, bpm, arc });
-      this.lead.rest = 99;
-      H.back = ["SB", "SBB", "DJ1", "KK", "KKB", "DJ2", "SH", "DJ3", "LEAD"];
+      Object.assign(this, keep);
+      this.lead.sinceFocus = 0;
+      H.on = true;
+      H.last = false;
+      this.crash = true;
+      if (H.cross && this.E >= 0.6) this.hand = null;
+      else if (H.cross) {
+        H.next.shift();
+        for (const n2 of H.next) this.muted.add(n2);
+      } else for (const n2 of H.next) [this.src[n2], this.ver[n2], this.prio[n2], this.varUntil[n2]] = old[n2];
       return;
     }
-    const n = H.back.shift();
-    this.muted.delete(n);
-    if (n === "LEAD") {
-      this.lead.rest = 0;
-      this.lead.sinceFocus = 0;
-    }
-    if (!H.back.length) {
+    const n = H.next.shift();
+    if (H.cross) this.muted.delete(n);
+    else this.useRhythm(n, H.to);
+    if (!H.next.length) {
       this.hand = null;
       this.muted.clear();
     }
+  }
+  leadIn(L) {
+    const H = this.hand, E = this.E, ppb = this.R.ppb;
+    if (E < 0.45 || !L || L.dense || L.cut) return L;
+    const pulseOk = (k) => 60 / this.bpm / k >= 0.085;
+    const sub = H.cross && pulseOk(H.to.ppb) ? H.to.ppb : ppb;
+    if (sub !== ppb) H.phrase ||= this.lead.pivot(sub, E);
+    const strokes = sub !== ppb ? H.phrase : L.strokes;
+    if (!H.last) return { ...L, strokes };
+    return { ...L, strokes: [...strokes.filter((x) => x.b < 2), ...this.lead.stream(sub).filter((x) => x.b >= 2)], dense: E >= 0.6 };
   }
   presence() {
     const budget = Math.abs(this.target - this.E) > 0.3 ? 2 : 1;
@@ -545,16 +563,14 @@ export class Engine {
     const special = this.queue.length ? this.queue.shift() : null;
     if (this.hand && !special) this.stepHandover();
     const R = this.R, ppb = R.ppb, steps = 4 * ppb, bip = this.rbar % 4;
-    if (!special && this.rbar % 2 === 0 && this.rbar > 0) {
-      if (this.morph) this.stepMorph();
-      this.presence();
-    }
+    if (!special && this.rbar % 2 === 0 && this.rbar > 0) this.presence();
     if (!special && bip === 0) this.vary();
     const cbar = this.rbar % (R.cycle || 1);
-    const L = special ? null : this.lead.bar(this.E, cbar, barSec);
+    let L = special ? null : this.lead.bar(this.E, cbar, barSec);
+    if (this.hand && !this.hand.on && !special) L = this.leadIn(L);
     this.updateTempo(barSec);
     const beat = 60 / this.bpm * this.sr;
-    const on = onsets(R.feel, ppb, this.bpm);
+    const on = this.feelNow(ppb);
     const grid = Array.from({ length: steps }, (_, s) => (Math.floor(s / ppb) + on[s % ppb]) * beat);
     const out = [];
     const crash = this.crash;
@@ -599,7 +615,7 @@ export class Engine {
       if (this.target - this.E < 0.1) this.acked = false;
       this.leadStrokes(out, strokes, grid, ppb, beat, vel);
     }
-    const bar = { t0: this.t, len: Math.round(4 * beat), events: out, info: { bar: this.bar, rhythm: this.R.name, ppb, bpm: this.bpm, tempo: this.tempo, tempoT: this.tempoT, E: this.E, target: this.target, special, morph: this.morph ? this.morph.to.name : this.hand ? this.hand.to.name : null, lead: special || (this.hand ? "handover" : this.lead.mode), center: this.center, auto: this.auto, players: ORDER.filter((n) => this.on[n]), done: false } };
+    const bar = { t0: this.t, len: Math.round(4 * beat), events: out, info: { bar: this.bar, rhythm: this.R.name, ppb, bpm: this.bpm, tempo: this.tempo, tempoT: this.tempoT, E: this.E, target: this.target, special, next: this.hand && !this.hand.on ? this.hand.to.name : null, lead: special || (this.hand && !this.hand.on ? "handover" : this.lead.mode), center: this.center, auto: this.auto, players: ORDER.filter((n) => this.on[n]), done: false } };
     this.t += bar.len;
     this.bar++;
     this.rbar++;
@@ -688,6 +704,7 @@ export class Engine {
       this.arc *= 0.5;
       return;
     }
+    this.feel = null;
     const keepOn = { ...this.on };
     const base = this.base, arc = this.arc;
     this.startRhythm(a);

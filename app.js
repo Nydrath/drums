@@ -1,4 +1,4 @@
-const APP_VERSION = "td-27";
+const APP_VERSION = "td-28";
 document.documentElement.dataset.version = APP_VERSION;
 const $ = (id) => document.getElementById(id);
 const store = { get: (k, d) => {
@@ -149,7 +149,7 @@ function showBar(i) {
     S.breakArmed = false;
     $("break").classList.remove("armed");
   }
-  $("rhythm").textContent = i.morph ? `${i.rhythm} → ${i.morph}` : i.rhythm;
+  $("rhythm").textContent = i.next ? `${i.rhythm} → ${i.next}` : i.rhythm;
   const what = NAMES[i.special || i.lead] ?? "";
   $("meta").textContent = `${Math.round(i.bpm)} bpm${what ? " · " + what : ""}`;
   $("energy").style.height = `${(i.E * 100).toFixed(1)}%`;
